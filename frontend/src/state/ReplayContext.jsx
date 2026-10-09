@@ -20,6 +20,10 @@ export const ReplayProvider = ({ children }) => {
   // Reconnect timeout ref
   const reconnectTimeout = useRef(null);
 
+  // Buffer for incoming high-frequency messages
+  const eventBuffer = useRef([]);
+  const alertBuffer = useRef([]);
+
   // Listen to Firestore high alerts
   useEffect(() => {
     const q = query(collection(db, "high_alerts"), orderBy("timestamp", "desc"), limit(5));
@@ -34,6 +38,21 @@ export const ReplayProvider = ({ children }) => {
       }
     });
     return () => unsub();
+  }, []);
+
+  // Flush buffer to state periodically (10 FPS)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (eventBuffer.current.length > 0) {
+        setVisibleEvents(prev => [...prev, ...eventBuffer.current]);
+        eventBuffer.current = [];
+      }
+      if (alertBuffer.current.length > 0) {
+        setVisibleAlerts(prev => [...prev, ...alertBuffer.current].slice(-100));
+        alertBuffer.current = [];
+      }
+    }, 100);
+    return () => clearInterval(timer);
   }, []);
 
   const connect = () => {
@@ -53,7 +72,7 @@ export const ReplayProvider = ({ children }) => {
         } else if (data.type === 'clock') {
           setCurrentTime(data.time);
         } else if (data.type === 'event') {
-          setVisibleEvents(prev => [...prev, data.data].slice(-100)); // keep last 100
+          eventBuffer.current.push(data.data);
         } else if (data.type === 'alert') {
           if (data.data.score > 80) {
             // Push to Firebase for high alerts (shared state)
@@ -63,7 +82,7 @@ export const ReplayProvider = ({ children }) => {
             }).catch(console.error);
           } else {
             // Normal alert, just local state
-            setVisibleAlerts(prev => [...prev, data.data].slice(-20)); // keep last 20
+            alertBuffer.current.push(data.data);
             setGlobalStatus('alert');
           }
         }

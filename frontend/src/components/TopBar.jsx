@@ -10,7 +10,7 @@ const TopBar = ({ incidentName }) => {
   const timeString = new Date(currentTime).toISOString().substring(11, 19);
 
   return (
-    <header className="h-16 bg-panel border-b border-border flex items-center justify-between px-6 shrink-0">
+    <header className="h-14 flex items-center justify-between px-8 shrink-0 bg-transparent">
       <div className="flex items-center gap-4">
         <h1 className="text-xl font-semibold text-primary">{incidentName || 'No Incident Selected'}</h1>
         <StatusChip status={globalStatus} />

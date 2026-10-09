@@ -3,16 +3,18 @@
 @import "tailwindcss";
 
 @theme {
-  --color-dark: #0F172A;
-  --color-panel: #1E293B;
-  --color-panel-hover: #334155;
-  --color-border: #334155;
+  --color-dark: #0a0a0c;
+  --color-panel: rgba(255, 255, 255, 0.03);
+  --color-panel-hover: rgba(255, 255, 255, 0.08);
+  --color-border: rgba(255, 255, 255, 0.08);
   --color-primary: #F8FAFC;
-  --color-secondary: #94A3B8;
-  --color-tertiary: #64748B;
-  --color-safe: #10B981;
-  --color-watch: #F59E0B;
-  --color-alert: #EF4444;
+  --color-secondary: #a1a1aa;
+  --color-tertiary: #52525b;
+  --color-safe: #4ade80;
+  --color-watch: #fde047;
+  --color-alert: #f43f5e;
+  
+  --color-accent-purple: #c084fc;
 
   --font-sans: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -20,9 +22,26 @@
 
 @layer base {
   body {
+    background: radial-gradient(circle at top left, #1a1a24, #0a0a0c 50%, #0a0a0c);
     background-color: var(--color-dark);
     color: var(--color-primary);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .bg-panel {
+    background-color: var(--color-panel);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  }
+  
+  .bg-panel-hover {
+    background-color: var(--color-panel-hover);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 }

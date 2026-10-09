@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { db } from '../firebase';
+import { collection, addDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 
 const ReplayContext = createContext();
 
@@ -10,12 +12,29 @@ export const ReplayProvider = ({ children }) => {
   const [currentTime, setCurrentTime] = useState(new Date().toISOString());
   const [visibleEvents, setVisibleEvents] = useState([]);
   const [visibleAlerts, setVisibleAlerts] = useState([]);
+  const [highAlerts, setHighAlerts] = useState([]);
   const [globalStatus, setGlobalStatus] = useState('safe');
 
   const ws = useRef(null);
   
   // Reconnect timeout ref
   const reconnectTimeout = useRef(null);
+
+  // Listen to Firestore high alerts
+  useEffect(() => {
+    const q = query(collection(db, "high_alerts"), orderBy("timestamp", "desc"), limit(5));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const alerts = [];
+      snapshot.forEach(doc => {
+        alerts.push({ id: doc.id, ...doc.data() });
+      });
+      setHighAlerts(alerts);
+      if (alerts.length > 0) {
+        setGlobalStatus('critical');
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const connect = () => {
     ws.current = new WebSocket('ws://localhost:8000/ws');
@@ -36,8 +55,17 @@ export const ReplayProvider = ({ children }) => {
         } else if (data.type === 'event') {
           setVisibleEvents(prev => [...prev, data.data].slice(-100)); // keep last 100
         } else if (data.type === 'alert') {
-          setVisibleAlerts(prev => [...prev, data.data].slice(-20)); // keep last 20
-          setGlobalStatus('alert');
+          if (data.data.score > 80) {
+            // Push to Firebase for high alerts (shared state)
+            addDoc(collection(db, "high_alerts"), {
+              ...data.data,
+              timestamp: new Date().toISOString()
+            }).catch(console.error);
+          } else {
+            // Normal alert, just local state
+            setVisibleAlerts(prev => [...prev, data.data].slice(-20)); // keep last 20
+            setGlobalStatus('alert');
+          }
         }
       } catch (err) {
         console.error('Failed to parse WS message', err);
@@ -85,6 +113,7 @@ export const ReplayProvider = ({ children }) => {
     currentTime,
     visibleEvents,
     visibleAlerts,
+    highAlerts,
     globalStatus,
     isPlaying,
     speed,

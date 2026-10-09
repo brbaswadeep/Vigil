@@ -10,10 +10,10 @@ const ReplayControls = () => {
   };
 
   return (
-    <div className="flex items-center gap-4 bg-panel border border-border px-4 py-2 rounded-lg shrink-0">
+    <div className="flex items-center gap-4 bg-panel px-4 py-2 rounded-lg shrink-0">
       <button 
         onClick={togglePlay}
-        className="flex items-center gap-2 px-3 py-1.5 bg-dark border border-border rounded hover:bg-panel-hover text-primary transition-colors"
+        className="flex items-center gap-2 px-3 py-1.5 bg-dark rounded hover:bg-tertiary text-primary transition-colors"
       >
         {isPlaying ? <Pause size={18} /> : <Play size={18} />}
         <span className="text-sm font-medium">{isPlaying ? 'Pause' : 'Play'}</span>
@@ -21,7 +21,7 @@ const ReplayControls = () => {
 
       <button 
         onClick={reset}
-        className="flex items-center gap-2 px-3 py-1.5 bg-dark border border-border rounded hover:bg-panel-hover text-secondary transition-colors"
+        className="flex items-center gap-2 px-3 py-1.5 bg-dark rounded hover:bg-tertiary text-secondary transition-colors"
       >
         <RotateCcw size={18} />
         <span className="text-sm font-medium text-primary">Reset</span>

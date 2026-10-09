@@ -1,0 +1,21 @@
+{
+  "features": {
+    "all": [
+      "log_usd",
+      "roll_cnt_5m",
+      "roll_usd_5m",
+      "ewma_z",
+      "new_recipient"
+    ],
+    "no_burst": [
+      "log_usd",
+      "new_recipient"
+    ]
+  },
+  "seed": 42,
+  "label_source": "nomad_attack_txs.csv",
+  "train": "nomad",
+  "test": "ronin",
+  "ronin_positives": 1,
+  "note": "XGBoost used; Ronin has 1 positive; no_burst evaluated to test magnitude sensitivity vs swarm velocity"
+}

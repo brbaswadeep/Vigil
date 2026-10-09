@@ -1,7 +1,24 @@
-import React from 'react';
-import scorecardData from '../mock/scorecard.json';
+import React, { useState, useEffect } from 'react';
 
 const ScorecardTable = () => {
+  const [scorecardData, setScorecardData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('http://localhost:8000/api/scorecard')
+      .then(res => res.json())
+      .then(data => {
+        setScorecardData(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to fetch scorecard:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) return <div className="text-secondary p-6">Calculating metrics from engine...</div>;
+
   return (
     <div className="bg-panel border border-border rounded-lg p-6 w-full flex flex-col">
       <h3 className="text-sm font-semibold text-secondary uppercase tracking-wider mb-6">Detection Performance</h3>

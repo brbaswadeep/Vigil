@@ -1,71 +1,100 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
-import mockEvents from '../mock/events.json';
-import mockAlerts from '../mock/alerts.json';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 const ReplayContext = createContext();
 
 export const useReplay = () => useContext(ReplayContext);
 
 export const ReplayProvider = ({ children }) => {
-  const allEvents = useMemo(() => mockEvents.sort((a, b) => new Date(a.ts) - new Date(b.ts)), []);
-  const allAlerts = useMemo(() => mockAlerts.sort((a, b) => new Date(a.raised_at) - new Date(b.raised_at)), []);
-
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1); // 1x, 10x, 100x
-  const [currentTime, setCurrentTime] = useState(() => {
-    return allEvents.length > 0 ? new Date(allEvents[0].ts).getTime() : Date.now();
-  });
+  const [speed, setSpeed] = useState(1);
+  const [currentTime, setCurrentTime] = useState(new Date().toISOString());
+  const [visibleEvents, setVisibleEvents] = useState([]);
+  const [visibleAlerts, setVisibleAlerts] = useState([]);
+  const [globalStatus, setGlobalStatus] = useState('safe');
 
-  const lastTickRef = useRef(null);
+  const ws = useRef(null);
+  
+  // Reconnect timeout ref
+  const reconnectTimeout = useRef(null);
 
-  useEffect(() => {
-    if (!isPlaying) {
-      lastTickRef.current = null;
-      return;
-    }
+  const connect = () => {
+    ws.current = new WebSocket('ws://localhost:8000/ws');
 
-    let animationFrameId;
-    const tick = (timestamp) => {
-      if (!lastTickRef.current) lastTickRef.current = timestamp;
-      const deltaMs = timestamp - lastTickRef.current;
-      lastTickRef.current = timestamp;
-
-      setCurrentTime((prevTime) => prevTime + deltaMs * speed);
-      animationFrameId = requestAnimationFrame(tick);
+    ws.current.onopen = () => {
+      console.log('Connected to Vigil Backend');
     };
 
-    animationFrameId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [isPlaying, speed]);
+    ws.current.onmessage = (message) => {
+      try {
+        const data = JSON.parse(message.data);
+        
+        if (data.type === 'status') {
+          setIsPlaying(data.isPlaying);
+          setSpeed(data.speed);
+        } else if (data.type === 'clock') {
+          setCurrentTime(data.time);
+        } else if (data.type === 'event') {
+          setVisibleEvents(prev => [...prev, data.data].slice(-100)); // keep last 100
+        } else if (data.type === 'alert') {
+          setVisibleAlerts(prev => [...prev, data.data].slice(-20)); // keep last 20
+          setGlobalStatus('alert');
+        }
+      } catch (err) {
+        console.error('Failed to parse WS message', err);
+      }
+    };
 
-  const visibleEvents = useMemo(() => {
-    return allEvents.filter(e => new Date(e.ts).getTime() <= currentTime);
-  }, [allEvents, currentTime]);
+    ws.current.onclose = () => {
+      console.log('Disconnected from Vigil Backend, retrying in 2s...');
+      reconnectTimeout.current = setTimeout(connect, 2000);
+    };
+  };
 
-  const visibleAlerts = useMemo(() => {
-    return allAlerts.filter(a => new Date(a.raised_at).getTime() <= currentTime);
-  }, [allAlerts, currentTime]);
+  useEffect(() => {
+    connect();
+    return () => {
+      if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
+      if (ws.current) {
+        ws.current.onclose = null;
+        ws.current.close();
+      }
+    };
+  }, []);
 
-  const globalStatus = visibleAlerts.length > 0 ? 'UNDER ATTACK' : (visibleEvents.length > 0 ? 'WATCHING' : 'CALM');
+  const sendAction = (action, payload = {}) => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ action, ...payload }));
+    }
+  };
 
-  const togglePlay = () => setIsPlaying(!isPlaying);
+  const togglePlay = () => sendAction(isPlaying ? 'pause' : 'play');
+  
   const reset = () => {
-    setIsPlaying(false);
-    setCurrentTime(allEvents.length > 0 ? new Date(allEvents[0].ts).getTime() : Date.now());
+    sendAction('reset');
+    setVisibleEvents([]);
+    setVisibleAlerts([]);
+    setGlobalStatus('safe');
+  };
+  
+  const handleSetSpeed = (newSpeed) => {
+    sendAction('speed', { value: newSpeed });
+    setSpeed(newSpeed);
+  };
+
+  const value = {
+    currentTime,
+    visibleEvents,
+    visibleAlerts,
+    globalStatus,
+    isPlaying,
+    speed,
+    togglePlay,
+    reset,
+    setSpeed: handleSetSpeed
   };
 
   return (
-    <ReplayContext.Provider value={{
-      isPlaying,
-      speed,
-      setSpeed,
-      currentTime,
-      visibleEvents,
-      visibleAlerts,
-      globalStatus,
-      togglePlay,
-      reset
-    }}>
+    <ReplayContext.Provider value={value}>
       {children}
     </ReplayContext.Provider>
   );

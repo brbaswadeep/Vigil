@@ -1,0 +1,25 @@
+[
+  {
+    "alert_id": "al_001",
+    "bridge": "nomad",
+    "raised_at": "2022-08-01T21:32:15Z",
+    "first_event_at": "2022-08-01T21:32:15Z",
+    "score": 95,
+    "level": "critical",
+    "exploit_type": "Swarm Drain",
+    "reason": "Withdrawal without matching deposit detected.",
+    "rule_hits": [
+      {
+        "rule": "no_matching_deposit",
+        "weight": 80,
+        "evidence": ["0xbadc0ffee"]
+      }
+    ],
+    "stat_signal": {
+      "name": "high_outflow_ewma",
+      "value": 1500000,
+      "weight": 15
+    },
+    "suggested_actions": ["Pause Bridge", "Rate Limit"]
+  }
+]

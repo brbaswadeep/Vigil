@@ -1,0 +1,54 @@
+{
+  "results": [
+    {
+      "bridge": "nomad",
+      "policy": "none",
+      "params": {},
+      "funds_lost_usd": 190000000,
+      "funds_saved_usd": 0,
+      "saved_pct": 0,
+      "legit_delayed_usd": 0,
+      "legit_delayed_pct": 0,
+      "false_pauses": 0
+    },
+    {
+      "bridge": "nomad",
+      "policy": "pause_first",
+      "params": { "pause_length_hours": 6 },
+      "funds_lost_usd": 20000000,
+      "funds_saved_usd": 170000000,
+      "saved_pct": 89.5,
+      "legit_delayed_usd": 4500000,
+      "legit_delayed_pct": 2.1,
+      "false_pauses": 1
+    },
+    {
+      "bridge": "nomad",
+      "policy": "pause_delay",
+      "params": { "pause_delay_minutes": 10, "pause_length_hours": 6 },
+      "funds_lost_usd": 50000000,
+      "funds_saved_usd": 140000000,
+      "saved_pct": 73.7,
+      "legit_delayed_usd": 4500000,
+      "legit_delayed_pct": 2.1,
+      "false_pauses": 1
+    },
+    {
+      "bridge": "nomad",
+      "policy": "rate_limit",
+      "params": { "daily_limit_pct": 10 },
+      "funds_lost_usd": 80000000,
+      "funds_saved_usd": 110000000,
+      "saved_pct": 57.9,
+      "legit_delayed_usd": 1200000,
+      "legit_delayed_pct": 0.5,
+      "false_pauses": 0
+    }
+  ],
+  "loss_curves": [
+    { "ts": "2022-08-01T21:30:00Z", "none": 0, "pause_first": 0, "pause_delay": 0, "rate_limit": 0 },
+    { "ts": "2022-08-01T21:40:00Z", "none": 20, "pause_first": 20, "pause_delay": 20, "rate_limit": 10 },
+    { "ts": "2022-08-01T21:50:00Z", "none": 80, "pause_first": 20, "pause_delay": 50, "rate_limit": 30 },
+    { "ts": "2022-08-01T22:00:00Z", "none": 190, "pause_first": 20, "pause_delay": 50, "rate_limit": 80 }
+  ]
+}

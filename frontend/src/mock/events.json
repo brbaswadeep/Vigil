@@ -1,0 +1,58 @@
+[
+  {
+    "event_id": "ev_001",
+    "ts": "2022-08-01T21:30:10Z",
+    "bridge": "nomad",
+    "kind": "deposit",
+    "chain": "source",
+    "tx_hash": "0x123456789",
+    "transfer_id": "tr_001",
+    "token": "USDC",
+    "amount": "1000.0",
+    "usd_value": 1000,
+    "actor": "0xabc",
+    "status": "pending"
+  },
+  {
+    "event_id": "ev_002",
+    "ts": "2022-08-01T21:32:10Z",
+    "bridge": "nomad",
+    "kind": "withdraw",
+    "chain": "destination",
+    "tx_hash": "0x987654321",
+    "transfer_id": "tr_001",
+    "token": "USDC",
+    "amount": "1000.0",
+    "usd_value": 1000,
+    "actor": "0xabc",
+    "status": "matched"
+  },
+  {
+    "event_id": "ev_003",
+    "ts": "2022-08-01T21:32:15Z",
+    "bridge": "nomad",
+    "kind": "withdraw",
+    "chain": "destination",
+    "tx_hash": "0xbadc0ffee",
+    "transfer_id": "tr_malicious_01",
+    "token": "USDC",
+    "amount": "1000000.0",
+    "usd_value": 1000000,
+    "actor": "0xevil",
+    "status": "unmatched"
+  },
+  {
+    "event_id": "ev_004",
+    "ts": "2022-08-01T21:32:18Z",
+    "bridge": "nomad",
+    "kind": "withdraw",
+    "chain": "destination",
+    "tx_hash": "0xbadc0ffef",
+    "transfer_id": "tr_malicious_02",
+    "token": "WETH",
+    "amount": "500.0",
+    "usd_value": 750000,
+    "actor": "0xevil2",
+    "status": "unmatched"
+  }
+]

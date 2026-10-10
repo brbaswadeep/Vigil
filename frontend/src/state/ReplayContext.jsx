@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { db } from '../firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 
 const ReplayContext = createContext();
 
@@ -14,6 +12,8 @@ export const ReplayProvider = ({ children }) => {
   const [visibleAlerts, setVisibleAlerts] = useState([]);
   const [highAlerts, setHighAlerts] = useState([]);
   const [globalStatus, setGlobalStatus] = useState('safe');
+  const [dataset, setDataset] = useState('nomad');
+  const [chartData, setChartData] = useState({ map: {}, firstEventTs: null, lastEventTs: null });
 
   const ws = useRef(null);
   
@@ -23,28 +23,35 @@ export const ReplayProvider = ({ children }) => {
   // Buffer for incoming high-frequency messages
   const eventBuffer = useRef([]);
   const alertBuffer = useRef([]);
+  const chartDataRef = useRef({ map: {}, firstEventTs: null, lastEventTs: null });
 
-  // Listen to Firestore high alerts
-  useEffect(() => {
-    const q = query(collection(db, "high_alerts"), orderBy("timestamp", "desc"), limit(5));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const alerts = [];
-      snapshot.forEach(doc => {
-        alerts.push({ id: doc.id, ...doc.data() });
-      });
-      setHighAlerts(alerts);
-      if (alerts.length > 0) {
-        setGlobalStatus('critical');
-      }
-    });
-    return () => unsub();
-  }, []);
+  // Local high alerts are now session-wise
+  // No longer using firestore for these in the replay session
 
   // Flush buffer to state periodically (10 FPS)
   useEffect(() => {
     const timer = setInterval(() => {
       if (eventBuffer.current.length > 0) {
-        setVisibleEvents(prev => [...prev, ...eventBuffer.current]);
+        const cd = chartDataRef.current;
+        eventBuffer.current.forEach(e => {
+          if (e.kind !== 'withdraw') return;
+          const ts = new Date(e.ts).getTime();
+          if (!cd.firstEventTs || ts < cd.firstEventTs) cd.firstEventTs = ts;
+          if (!cd.lastEventTs || ts > cd.lastEventTs) cd.lastEventTs = ts;
+
+          const d = new Date(ts);
+          const sec = Math.floor(d.getSeconds() / 5) * 5;
+          d.setSeconds(sec, 0);
+          const key = d.getTime();
+          
+          if (!cd.map[key]) {
+            cd.map[key] = { time: d.toISOString().substring(11, 19), amount: 0, ts: key };
+          }
+          cd.map[key].amount += (e.usd_value || 0);
+        });
+
+        setVisibleEvents(prev => [...prev, ...eventBuffer.current].slice(-100));
+        setChartData({ ...cd });
         eventBuffer.current = [];
       }
       if (alertBuffer.current.length > 0) {
@@ -71,15 +78,14 @@ export const ReplayProvider = ({ children }) => {
           setSpeed(data.speed);
         } else if (data.type === 'clock') {
           setCurrentTime(data.time);
+        } else if (data.type === 'dataset') {
+          setDataset(data.dataset);
         } else if (data.type === 'event') {
           eventBuffer.current.push(data.data);
         } else if (data.type === 'alert') {
           if (data.data.score > 80) {
-            // Push to Firebase for high alerts (shared state)
-            addDoc(collection(db, "high_alerts"), {
-              ...data.data,
-              timestamp: new Date().toISOString()
-            }).catch(console.error);
+            setHighAlerts(prev => [{ ...data.data, id: Date.now().toString() + Math.random(), resolved: false, timestamp: new Date().toISOString() }, ...prev].slice(0, 10));
+            setGlobalStatus('critical');
           } else {
             // Normal alert, just local state
             alertBuffer.current.push(data.data);
@@ -118,14 +124,38 @@ export const ReplayProvider = ({ children }) => {
   
   const reset = () => {
     sendAction('reset');
+    chartDataRef.current = { map: {}, firstEventTs: null, lastEventTs: null };
     setVisibleEvents([]);
     setVisibleAlerts([]);
+    setHighAlerts([]);
+    setChartData(chartDataRef.current);
     setGlobalStatus('safe');
   };
   
   const handleSetSpeed = (newSpeed) => {
     sendAction('speed', { value: newSpeed });
     setSpeed(newSpeed);
+  };
+
+  const loadDataset = (ds) => {
+    sendAction('load_dataset', { dataset: ds });
+    chartDataRef.current = { map: {}, firstEventTs: null, lastEventTs: null };
+    setVisibleEvents([]);
+    setVisibleAlerts([]);
+    setHighAlerts([]);
+    setChartData(chartDataRef.current);
+    setGlobalStatus('safe');
+  };
+
+  const resolveAlert = (alertId) => {
+    setHighAlerts(prev => prev.map(a => a.id === alertId ? { ...a, resolved: true } : a));
+    // If all are resolved, downgrade global status
+    setHighAlerts(prev => {
+      if (prev.every(a => a.resolved)) {
+        setGlobalStatus(visibleAlerts.length > 0 ? 'alert' : 'safe');
+      }
+      return prev;
+    });
   };
 
   const value = {
@@ -136,9 +166,13 @@ export const ReplayProvider = ({ children }) => {
     globalStatus,
     isPlaying,
     speed,
+    dataset,
+    chartData,
     togglePlay,
     reset,
-    setSpeed: handleSetSpeed
+    setSpeed: handleSetSpeed,
+    loadDataset,
+    resolveAlert
   };
 
   return (

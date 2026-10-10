@@ -1,47 +1,41 @@
 import React, { useMemo, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useReplay } from '../state/ReplayContext';
 
 const OutflowChart = () => {
-  const { visibleEvents } = useReplay();
+  const { chartData, dataset } = useReplay();
   const [activeTab, setActiveTab] = useState('Compare All');
-  const tabs = ['Compare All', 'Hybrid', 'ML Model', 'Rule-Based'];
+  const tabs = ['Compare All', 'Actual Attack', 'Hybrid', 'ML Model', 'Rule-Based'];
 
   const data = useMemo(() => {
-    if (visibleEvents.length === 0) return [];
+    if (!chartData || !chartData.firstEventTs) return [];
 
-    const map = {};
-    let firstEventTs = null;
-    let lastEventTs = null;
-
-    visibleEvents.forEach(e => {
-      if (e.kind !== 'withdraw') return;
-      const d = new Date(e.ts);
-      const ts = d.getTime();
-      
-      if (!firstEventTs || ts < firstEventTs) firstEventTs = ts;
-      if (!lastEventTs || ts > lastEventTs) lastEventTs = ts;
-
-      const sec = Math.floor(d.getSeconds() / 5) * 5;
-      d.setSeconds(sec, 0);
-      const key = d.getTime();
-      
-      if (!map[key]) {
-        map[key] = { time: d.toISOString().substring(11, 19), amount: 0, ts: key };
-      }
-      map[key].amount += e.usd_value;
-    });
+    const { map, firstEventTs, lastEventTs } = chartData;
 
     // Define when each model triggers a pause (in ms after first event)
-    const hybridPauseTime = firstEventTs ? firstEventTs + 15000 : Infinity;
-    const mlPauseTime = firstEventTs ? firstEventTs + 45000 : Infinity;
-    const rulePauseTime = firstEventTs ? firstEventTs + 120000 : Infinity;
+    let hybridPauseTime = Infinity;
+    let mlPauseTime = Infinity;
+    let rulePauseTime = Infinity;
 
-    // Fill missing 5-second gaps with 0 for accurate up/down visualization
+    if (dataset === 'nomad') {
+      hybridPauseTime = firstEventTs + 1000;
+      mlPauseTime = firstEventTs + 45000;
+      rulePauseTime = firstEventTs + 120000;
+    } else {
+      hybridPauseTime = firstEventTs + 1000;
+      mlPauseTime = firstEventTs + 15000;
+      rulePauseTime = firstEventTs + 518400000; // 6 days
+    }
+
     const finalData = [];
     if (firstEventTs && lastEventTs) {
-      let currentTs = Math.floor(firstEventTs / 5000) * 5000;
       const endTs = Math.floor(lastEventTs / 5000) * 5000;
+      let currentTs = Math.floor(firstEventTs / 5000) * 5000; // Start from beginning for cumulative
+      
+      let cumActual = 0;
+      let cumHybridLoss = 0, cumHybridSaved = 0;
+      let cumMlLoss = 0, cumMlSaved = 0;
+      let cumRuleLoss = 0, cumRuleSaved = 0;
 
       while (currentTs <= endTs) {
         const item = map[currentTs] || { 
@@ -50,20 +44,42 @@ const OutflowChart = () => {
           ts: currentTs 
         };
 
-        // If after pause time, volume drops to 0
+        cumActual += item.amount;
+        
+        if (item.ts > hybridPauseTime) cumHybridSaved += item.amount;
+        else cumHybridLoss += item.amount;
+
+        if (item.ts > mlPauseTime) cumMlSaved += item.amount;
+        else cumMlLoss += item.amount;
+
+        if (item.ts > rulePauseTime) cumRuleSaved += item.amount;
+        else cumRuleLoss += item.amount;
+
         finalData.push({
           time: item.time,
-          Hybrid: item.ts > hybridPauseTime ? 0 : item.amount,
-          "ML Model": item.ts > mlPauseTime ? 0 : item.amount,
-          "Rule-Based": item.ts > rulePauseTime ? 0 : item.amount
+          ts: currentTs,
+          "Actual Loss": cumActual,
+          "Hybrid Loss": cumHybridLoss,
+          "Hybrid Saved": cumHybridSaved,
+          "ML Loss": cumMlLoss,
+          "ML Saved": cumMlSaved,
+          "Rule Loss": cumRuleLoss,
+          "Rule Saved": cumRuleSaved,
         });
 
         currentTs += 5000;
       }
+      
+      // For sliding window, return only the last 100 items (or all if we want to show the full cumulative curve)
+      // Since it's a cumulative chart, seeing the full history is often better, but let's stick to the sliding window
+      // so the chart doesn't get infinitely compressed.
+      if (finalData.length > 100) {
+        return finalData.slice(-100);
+      }
     }
 
     return finalData;
-  }, [visibleEvents]);
+  }, [chartData]);
 
   const getColor = (model) => {
     if (model === 'Hybrid') return '#34d399';
@@ -95,26 +111,39 @@ const OutflowChart = () => {
         
         <div className="flex-1 w-full min-h-0 relative z-10">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+            <ComposedChart data={data} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
               <XAxis dataKey="time" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} minTickGap={30} />
               <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(value) => `$${(value / 1000000).toFixed(1)}M`} width={60} />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', borderRadius: '8px', padding: '12px' }}
                 itemStyle={{ fontSize: '13px', paddingBottom: '4px' }}
-                formatter={(value) => [`$${value.toLocaleString(undefined, {maximumFractionDigits: 0})}`, ' Volume']}
+                formatter={(value) => [`$${value.toLocaleString(undefined, {maximumFractionDigits: 0})}`, ' Cumulative USD']}
               />
               <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
               
-              {(activeTab === 'Compare All' || activeTab === 'Rule-Based') && (
-                <Line type="monotone" dataKey="Rule-Based" stroke="#ef4444" strokeWidth={activeTab === 'Rule-Based' ? 3 : 2} dot={false} isAnimationActive={false} />
-              )}
-              {(activeTab === 'Compare All' || activeTab === 'ML Model') && (
-                <Line type="monotone" dataKey="ML Model" stroke="#eab308" strokeWidth={activeTab === 'ML Model' ? 3 : 2} dot={false} isAnimationActive={false} />
-              )}
+              <Line type="monotone" dataKey="Actual Loss" stroke="#ef4444" strokeWidth={2} dot={false} isAnimationActive={false} strokeDasharray="3 3" />
+
               {(activeTab === 'Compare All' || activeTab === 'Hybrid') && (
-                <Line type="monotone" dataKey="Hybrid" stroke="#34d399" strokeWidth={activeTab === 'Hybrid' ? 3 : 2} dot={false} isAnimationActive={false} />
+                <>
+                  <Area type="monotone" dataKey="Hybrid Loss" stackId="hybrid" stroke="none" fill="#ef4444" fillOpacity={0.2} isAnimationActive={false} />
+                  <Area type="monotone" dataKey="Hybrid Saved" stackId="hybrid" stroke="none" fill="#34d399" fillOpacity={0.4} isAnimationActive={false} />
+                </>
               )}
-            </LineChart>
+              
+              {(activeTab === 'Compare All' || activeTab === 'ML Model') && (
+                <>
+                  <Area type="monotone" dataKey="ML Loss" stackId="ml" stroke="none" fill="#ef4444" fillOpacity={0.1} isAnimationActive={false} />
+                  <Area type="monotone" dataKey="ML Saved" stackId="ml" stroke="none" fill="#eab308" fillOpacity={0.3} isAnimationActive={false} />
+                </>
+              )}
+
+              {(activeTab === 'Compare All' || activeTab === 'Rule-Based') && (
+                <>
+                  <Area type="monotone" dataKey="Rule Loss" stackId="rule" stroke="none" fill="#ef4444" fillOpacity={0.1} isAnimationActive={false} />
+                  <Area type="monotone" dataKey="Rule Saved" stackId="rule" stroke="none" fill="#f97316" fillOpacity={0.3} isAnimationActive={false} />
+                </>
+              )}
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>

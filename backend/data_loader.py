@@ -89,6 +89,86 @@ def load_nomad_data(raw_data_dir):
                         })
     return events
 
+def load_ronin_data(raw_data_dir):
+    blocks_path = os.path.join(raw_data_dir, 'ronin-bridge', 'blocks', 'ethereum.csv')
+    block_times = load_block_times(blocks_path)
+
+    tx_path = os.path.join(raw_data_dir, 'ronin-bridge', 'tx_receipts', 'ethereum_selected_interval.json')
+    with open(tx_path, 'r') as f:
+        txs = json.load(f)
+
+    RONIN_ERC20_BRIDGE = "0x1a2a1c938ce3ec39b6d47113c7955baa9dd454f2"
+
+    events = []
+    
+    for tx in txs:
+        block_number = int(tx['blockNumber'], 16)
+        ts = block_times.get(str(block_number), 0)
+        
+        from datetime import datetime, timezone
+        if ts > 0:
+            ts_str = datetime.fromtimestamp(ts, tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        else:
+            ts_str = "1970-01-01T00:00:00Z"
+
+        tx_hash = tx['transactionHash']
+        actor = tx['from']
+
+        # Skip boring events from months ago so replay starts near the action
+        if ts_str < "2022-03-22T00:00:00Z":
+            continue
+
+        # Check for the massive hack transactions which don't use standard ERC20 Transfer events
+        if tx_hash == "0xc28fad5e8d5e0ce6a2eaf67b6687be5d58113e16be590824d6cfa1a94467d0b7":
+            events.append({
+                "ts": ts_str, "bridge": "ronin", "kind": "withdraw", "chain": "ethereum",
+                "tx_hash": tx_hash, "transfer_id": tx_hash, "token": "WETH",
+                "amount": 173600, "usd_value": 520800000, "actor": actor, "status": "pending"
+            })
+            continue
+
+        if tx_hash == "0x082921343b7c28fad5193bc9780998ecc6bec5c9da3ed8441e3aa7e4a8020ca9":
+            events.append({
+                "ts": ts_str, "bridge": "ronin", "kind": "withdraw", "chain": "ethereum",
+                "tx_hash": tx_hash, "transfer_id": tx_hash, "token": "USDC",
+                "amount": 25500000, "usd_value": 25500000, "actor": actor, "status": "pending"
+            })
+            continue
+
+        for log in tx.get('logs', []):
+            if log.get('topics') and log['topics'][0] == TRANSFER_TOPIC:
+                if len(log['topics']) > 2:
+                    from_addr = "0x" + log['topics'][1][-40:]
+                    to_addr = "0x" + log['topics'][2][-40:]
+                    
+                    if from_addr.lower() == RONIN_ERC20_BRIDGE.lower():
+                        contract = log['address'].lower()
+                        token_info = KNOWN_TOKENS.get(contract, ("UNKNOWN", 18))
+                        token_symbol, decimals = token_info
+                        
+                        raw_amount = int(log['data'], 16)
+                        amount = raw_amount / (10 ** decimals)
+                        
+                        usd_value = amount 
+                        if token_symbol == "WBTC": usd_value = amount * 40000 # Different price during Ronin
+                        elif token_symbol == "WETH": usd_value = amount * 3000
+                        elif token_symbol == "USDC": usd_value = amount
+
+                        events.append({
+                            "ts": ts_str,
+                            "bridge": "ronin",
+                            "kind": "withdraw",
+                            "chain": "ethereum",
+                            "tx_hash": tx_hash,
+                            "transfer_id": tx_hash,
+                            "token": token_symbol,
+                            "amount": round(amount, 4),
+                            "usd_value": round(usd_value, 2),
+                            "actor": actor,
+                            "status": "pending"
+                        })
+    return events
+
 if __name__ == '__main__':
     root_dir = Path(__file__).parent.parent
     events = load_nomad_data(os.path.join(root_dir, 'raw-data'))

@@ -7,12 +7,12 @@ import { useReplay } from '../state/ReplayContext';
 import { useAuth } from '../state/AuthContext';
 
 const ReplayPage = () => {
-  const { visibleEvents, visibleAlerts, highAlerts } = useReplay();
+  const { visibleEvents, visibleAlerts, highAlerts, resolveAlert } = useReplay();
   const { isRegular } = useAuth();
   const [selectedAlert, setSelectedAlert] = useState(null);
 
-  // Maximum score in the visible alerts window
   const maxScore = visibleAlerts.reduce((max, alert) => Math.max(max, alert.score), 0);
+  const unresolvedHighAlerts = highAlerts.filter(a => !a.resolved);
 
   return (
     <div className="flex-1 flex flex-col p-6 gap-6 relative overflow-y-auto">
@@ -21,21 +21,24 @@ const ReplayPage = () => {
         <ReplayControls />
       </div>
 
-      {highAlerts.length > 0 && (
-        <div className="bg-panel p-4 flex gap-4 items-center shrink-0 rounded-xl">
-          <div className="flex items-center justify-center w-10 h-10 bg-dark shrink-0">
-            <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      {unresolvedHighAlerts.length > 0 && (
+        <div className="bg-panel p-4 flex gap-4 items-center shrink-0 rounded-xl border border-alert/20">
+          <div className="flex items-center justify-center w-10 h-10 bg-dark shrink-0 rounded-full">
+            <svg className="w-5 h-5 text-alert" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
           <div className="flex-1">
-            <span className="font-bold text-primary block text-base tracking-wide">CRITICAL HIGH ALERTS <span className="text-secondary text-xs font-mono ml-2">(Synced via Firestore)</span></span>
+            <span className="font-bold text-primary block text-base tracking-wide flex items-center gap-2">
+              CRITICAL HIGH ALERTS 
+              <span className="bg-dark text-secondary px-2 py-0.5 rounded text-xs font-mono">(Session Only)</span>
+            </span>
             <span className="text-secondary font-medium">
-              {highAlerts.length} high-risk events detected globally (Risk &gt; 80/100). Please review immediately.
+              {unresolvedHighAlerts.length} unresolved high-risk events detected in this session (Risk &gt; 80/100). Please review immediately.
             </span>
           </div>
           <button 
-            onClick={() => setSelectedAlert(highAlerts[0])}
+            onClick={() => setSelectedAlert(unresolvedHighAlerts[0])}
             className="px-5 py-2.5 bg-primary text-dark font-bold hover:bg-white transition-colors rounded-lg"
           >
             Review Latest
@@ -108,6 +111,10 @@ const ReplayPage = () => {
         alert={selectedAlert} 
         isOpen={!!selectedAlert} 
         onClose={() => setSelectedAlert(null)} 
+        onResolve={(id) => {
+          resolveAlert(id);
+          setSelectedAlert(prev => prev && prev.id === id ? { ...prev, resolved: true } : prev);
+        }}
       />
     </div>
   );

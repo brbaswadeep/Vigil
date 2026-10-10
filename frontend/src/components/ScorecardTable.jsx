@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useReplay } from '../state/ReplayContext';
 
 const ScorecardTable = () => {
   const [scorecardData, setScorecardData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { dataset } = useReplay();
 
   useEffect(() => {
+    setLoading(true);
     fetch('http://localhost:8000/api/scorecard')
       .then(res => res.json())
       .then(data => {
@@ -15,7 +18,7 @@ const ScorecardTable = () => {
         console.error("Failed to fetch scorecard:", err);
         setLoading(false);
       });
-  }, []);
+  }, [dataset]);
 
   if (loading) return <div className="text-secondary p-6">Calculating metrics from engine...</div>;
 

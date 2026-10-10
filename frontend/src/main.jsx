@@ -9,11 +9,11 @@ import { AuthProvider } from './state/AuthContext.jsx'
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
-      <PolicyProvider>
-        <ReplayProvider>
+      <ReplayProvider>
+        <PolicyProvider>
           <App />
-        </ReplayProvider>
-      </PolicyProvider>
+        </PolicyProvider>
+      </ReplayProvider>
     </AuthProvider>
   </StrictMode>,
 )

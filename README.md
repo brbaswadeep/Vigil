@@ -1,86 +1,69 @@
-# Vigil 🛡️
+# 🛡️ Vigil
 
-Vigil is an automated incident response and replay engine designed to detect and mitigate cross-chain bridge exploits in real-time. It uses a combination of deterministic rules and statistical anomaly detection (EWMA) to identify unauthorized withdrawals and simulate automated policy responses.
+> A live bridge watchdog with a response-policy simulator.
 
-This repository contains:
-1. **Frontend**: A React/Vite/Tailwind v4 dashboard for real-time monitoring and replay simulation.
-2. **Backend**: A Python/FastAPI WebSocket engine that processes raw transaction data and streams events/alerts to the frontend.
+**Vigil** is an automated incident response and replay engine designed to detect and mitigate cross-chain bridge exploits in real-time. It uses a combination of deterministic rules and statistical anomaly detection (EWMA) to identify unauthorized withdrawals and simulate automated policy responses.
 
----
+Vigil answers a critical question that operators face: **which defense saves the most money on real incidents, and at what cost to normal users?**
+
+## ✨ Features
+
+- **Real-Time Replay Engine**: Replay real bridge attacks (e.g., Nomad, Ronin) with full speed controls.
+- **Explainable Rules Engine**: Precise, deterministic rules catching unauthorized withdrawals, amount, or token mismatches.
+- **Statistical Layer (EWMA)**: Catches fast drains and swarms without hand-set thresholds by analyzing cumulative outflows.
+- **Response Policy Simulator**: Test defense strategies (Pause, Delayed Pause, Rate Limiting) to see how much illicit flow is stopped vs. legitimate volume delayed.
+- **Explainable Alerts**: Responder-facing alerts that pinpoint exactly why an incident was flagged (broken rules, evidence, contributing signals).
+- **Comprehensive Scorecard**: Directly compares precision, recall, and false alarms between Rule-based, Statistical, and Hybrid configurations.
 
 ## 🚀 Quick Start Guide
-
-Follow these instructions to set up and run Vigil on your local machine.
 
 ### Prerequisites
 - Node.js (v18+)
 - Python (3.9+)
 - Git
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/brbaswadeep/Vigil.git
-cd Vigil
-```
-
-### 2. Set Up the Python Backend
-The backend engine loads the raw dataset, processes the simulation rules, and streams data over WebSockets.
+### 1. Backend Setup
+The backend engine loads the raw dataset, evaluates simulation rules, and streams real-time data over WebSockets.
 
 ```bash
-# Navigate to the backend directory
 cd backend
-
-# Create a virtual environment
 python3 -m venv venv
-
-# Activate the virtual environment
-# On macOS/Linux:
 source venv/bin/activate
-# On Windows:
-# venv\Scripts\activate
-
-# Install the required dependencies
 pip install fastapi uvicorn[standard] websockets pandas
-
-# Start the WebSocket server
 python server.py
 ```
-*The backend should now be running on `http://0.0.0.0:8000`.*
+*Backend runs on `http://0.0.0.0:8000`.*
 
-### 3. Set Up the React Frontend
-Open a **new terminal window/tab**, ensure you are in the root `Vigil` directory, and start the frontend.
+### 2. Frontend Setup
+The frontend is a React/Vite and Tailwind CSS v4 dashboard.
 
 ```bash
-# Navigate to the frontend directory
 cd frontend
-
-# Install Node dependencies
 npm install
-
-# Start the Vite development server
 npm run dev
 ```
-*The frontend should now be running on `http://localhost:5173`.*
+*Frontend runs on `http://localhost:5173`.*
 
----
+## 🎮 How to Use the Dashboard
 
-## 🎮 How to Use the App
-
-1. Open your browser and navigate to `http://localhost:5173`.
-2. Click on the **Replay** tab in the sidebar.
-3. Make sure both the backend and frontend are running. 
-4. Click the **Play** button on the control bar.
-5. Watch as the real historical transactions from the Nomad Bridge hack are streamed into the UI, triggering real-time alerts and rule evaluations!
-
----
+1. Navigate to `http://localhost:5173`.
+2. Go to the **Replay** tab in the sidebar.
+3. Click the **Play** button on the control bar (adjust speed as needed).
+4. Watch as historical transactions are streamed, triggering real-time alerts.
+5. Use the **Policies** tab to simulate defense mechanisms (e.g., rate limits) against the attack to see funds saved.
 
 ## 🏗️ Architecture
 
-- **Data Source**: Analyzes raw Ethereum `tx_receipts` from the 2022 Nomad Bridge Exploit.
-- **Rule Engine**: Deterministically matches source-chain deposits to destination-chain withdrawals.
-- **Statistical Layer**: Utilizes an Exponentially Weighted Moving Average (EWMA) to detect sudden outflow swarms.
-- **Scorer**: Combines rule hits and stat signals into a 0-100 severity score.
+- **Data Source**: Parses and normalizes raw Ethereum transactions from bridge exploits.
+- **Rule Engine**: Evaluates withdrawals against source-chain deposits for mismatches.
+- **Statistical Layer**: EWMA outflow baseline band detects sudden, coordinated swarm drains.
+- **Scorer**: Combines rule hits and stat signals into a deterministic 0-100 severity risk score.
+- **Policy Simulator**: Replays attack curves under different conditions to generate loss over time and legitimate volume delayed.
 
 ## 🛠️ Tech Stack
+
 - **Frontend**: React 18, Vite, Tailwind CSS v4, Recharts, Lucide React
 - **Backend**: Python 3, FastAPI, Uvicorn, Websockets, Pandas
+
+## 📜 License
+MIT License

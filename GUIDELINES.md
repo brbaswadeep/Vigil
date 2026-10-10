@@ -30,7 +30,7 @@ These rules apply to every file, screen, endpoint and commit in the project. The
 ## 2. Design rules
 
 ### 2.1 One color scheme, defined once
-- All colors live in `frontend/src/theme.js` and the Tailwind config that reads from it.
+- All colors live in `frontend/src/lib/theme.ts` and the Tailwind config that reads from it.
 - No hex values, `rgb()` values or arbitrary color classes inside components or pages.
 - Every screen uses the same palette. A new color is added to the theme first, never inline.
 
@@ -80,7 +80,7 @@ These rules apply to every file, screen, endpoint and commit in the project. The
 
 ### 3.1 Everything configurable lives in `.env`
 - API keys, tokens, URLs, thresholds, weights paths, ports, origins and any other configuration come from `.env` only.
-- Code reads configuration through one module: `backend/app/config.py` on the backend. The frontend reads only public build-time values that are safe to expose, through `import.meta.env` with the `VITE_` prefix.
+- Code reads configuration through one module: `backend/app/config.py` on the backend. The frontend reads secrets only on the Next.js server (Server Actions and server components) from variables without the `NEXT_PUBLIC_` prefix. Browser code reads only `NEXT_PUBLIC_` values, which are public by definition.
 - No secret is ever hardcoded, logged, committed, returned by an API, or rendered in the UI.
 - No default fallback that contains a real secret. Missing required settings stop the app at startup with a clear error.
 
@@ -96,20 +96,22 @@ __pycache__/
 node_modules/
 dist/
 .venv/
+.next/
+out/
 ```
 
 - Only `.env.example` is committed. It lists every variable name with empty or safe placeholder values.
 - Before every push, run a secret scan on the staged changes. If a secret was ever committed, rotate it immediately. Removing it in a later commit is not enough.
 
 ### 3.3 Frontend never holds secrets
-- Anything in the frontend bundle is public. The control token and any private key never go in `VITE_` variables.
+- Anything in the browser bundle is public. The control token and any private key never go in `NEXT_PUBLIC_` variables and are never read inside a `"use client"` file.
 - Privileged actions go through the backend, which checks the token server side.
 
 ### 3.4 `.env.example` baseline
 
 ```
 APP_ENV=development
-DASHBOARD_ORIGIN=http://localhost:5173
+DASHBOARD_ORIGIN=http://localhost:3000
 CONTROL_TOKEN=
 DATA_DIR=./data
 RULE_WEIGHTS_PATH=./config/weights.json
@@ -119,7 +121,14 @@ EWMA_ALPHA=0.2
 STAT_THRESHOLD=4
 PAUSE_HOURS_DEFAULT=6
 RATE_LIMIT_PCT_DEFAULT=10
-VITE_API_BASE_URL=http://localhost:8000
+```
+
+Frontend `frontend/.env.local`, also gitignored:
+
+```
+BACKEND_URL=http://localhost:8000
+CONTROL_TOKEN=
+NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws/replay
 ```
 
 ---
@@ -133,7 +142,7 @@ VITE_API_BASE_URL=http://localhost:8000
 - API docs pages (for example the built-in FastAPI docs) are disabled outside `development`.
 
 ### 4.2 Every endpoint is deliberately secured
-- State-changing endpoints (replay control, policy runs) require the control token from `.env`, checked server side.
+- State-changing endpoints (replay control, policy runs) require the control token from `.env`, checked server side. The frontend calls them only through Next.js Server Actions, so the token stays on the server.
 - Read endpoints expose only what the UI needs. Responses never include internal paths, stack traces or configuration.
 - CORS allows only the dashboard origin from `.env`. No wildcard origins.
 - All request bodies and query parameters are validated with Pydantic models, with bounds on numeric values such as speed and policy parameters.
@@ -144,6 +153,19 @@ VITE_API_BASE_URL=http://localhost:8000
 - Pin versions in `requirements.txt` and `package.json` lock files.
 - Add a dependency only when it is clearly needed. Prefer the standard library and what is already installed.
 - Run a dependency audit before the demo.
+
+---
+
+## 4A. Next.js rules
+
+- Use the App Router with TypeScript. Keep components server components by default and add `"use client"` only when a file needs state, effects or browser APIs.
+- Privileged calls to the backend go through Server Actions in `app/actions.ts`. No route handlers are created unless a UI caller needs one, and each must be listed in the README API table.
+- Secrets are read only in server code. Never import a server module into a client component.
+- Client components receive only the data they need as props. Do not pass full config objects, tokens or raw backend responses.
+- `next.config.ts` sets `poweredByHeader` to false and adds security headers: content type options, referrer policy and frame ancestors.
+- Do not use `dangerouslySetInnerHTML`. Alert text is rendered as plain text from fixed templates.
+- Styling uses Tailwind classes mapped to the theme tokens only. No inline `style` colors, no CSS files that define colors outside the theme.
+- Run `next build` and `next lint` before every merge. Both must pass with no warnings left behind.
 
 ---
 
@@ -198,6 +220,9 @@ VITE_API_BASE_URL=http://localhost:8000
 - [ ] No unused endpoints, every route has a caller
 - [ ] State-changing endpoints require the control token
 - [ ] CORS limited to the dashboard origin
+- [ ] No secret read in a client component or exposed through a `NEXT_PUBLIC_` variable
+- [ ] Privileged calls go through Server Actions
+- [ ] `next build` and `next lint` pass
 - [ ] No comments, no dead code, no unused imports
 - [ ] Tests added or updated and passing
 - [ ] Any number shown in the UI comes from measured output

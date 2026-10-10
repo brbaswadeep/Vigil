@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, ShieldAlert } from 'lucide-react';
 
-const AlertDrawer = ({ alert, isOpen, onClose }) => {
+const AlertDrawer = ({ alert, isOpen, onClose, onResolve }) => {
   if (!isOpen || !alert) return null;
 
   return (
@@ -79,6 +79,21 @@ const AlertDrawer = ({ alert, isOpen, onClose }) => {
             </ul>
           </section>
 
+        </div>
+        <div className="p-4 border-t border-border bg-panel">
+          {alert.id && (
+            <button
+              onClick={() => onResolve(alert.id)}
+              disabled={alert.resolved}
+              className={`w-full py-3 rounded-lg font-bold text-sm transition-colors ${
+                alert.resolved 
+                  ? 'bg-dark text-secondary cursor-not-allowed border border-border'
+                  : 'bg-primary text-dark hover:bg-white'
+              }`}
+            >
+              {alert.resolved ? '✓ Alert Resolved' : 'Mark as Resolved'}
+            </button>
+          )}
         </div>
       </div>
     </>
